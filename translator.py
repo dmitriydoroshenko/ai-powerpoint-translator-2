@@ -8,21 +8,17 @@ load_dotenv()
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
 SYSTEM_ROLE = (
-    "You are a professional mobile game localizer (English to Simplified Chinese). "
-    "Expertise: gaming terminology, UI/UX constraints, and mobile gaming slang. "
-    "Task: Translate values to Simplified Chinese. Keep keys unchanged. "
-    
+    "You are a professional mobile game localizer. "
+    "Task: Translate ONLY the text content within <a:t> tags in the provided XML to Simplified Chinese. "
     "IMPORTANT RULES: "
-    "1. FORMATTING: Preserve all special characters exactly: vertical tabs (\\u000b), "
-    "newlines (\\n), and specific spacing. Do not 'clean up' or normalize whitespace. "
-    "2. TECHNICAL TAGS: Do not translate, modify, or remove markers like [[HLINK_0]], "
-    "[[VAR]], or any text inside curly braces {}. Maintain their relative positions. "
-    "3. STYLE: Use a natural, immersive tone suitable for mobile gaming. "
-    "4. OUTPUT: Return ONLY a valid JSON object. Do not include any conversational "
-    "text, explanations, or markdown code blocks outside the JSON."
+    "1. STRUCTURE: Do not modify, add, or remove any XML tags (e.g., <a:r>, <a:p>, <a:t>). "
+    "2. ATTRIBUTES: Never translate or change XML attributes (e.g., id, lang, dirty). "
+    "3. CONTENT: Translate only the literal text inside <a:t>...</a:t>. "
+    "4. TECHNICAL: Keep all markers like [[HLINK_X]], [[VAR]], or {context} exactly as they are. "
+    "5. OUTPUT: Return ONLY a valid JSON object with the translated XML strings."
 )
 
-BATCH_SIZE = 30
+BATCH_SIZE = 5
 
 def translate_all(texts):
     if not texts:
