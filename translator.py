@@ -13,9 +13,7 @@ SYSTEM_ROLE = (
     "IMPORTANT RULES: "
     "1. STRUCTURE: Do not modify, add, or remove any XML tags (e.g., <a:r>, <a:p>, <a:t>). "
     "2. ATTRIBUTES: Never translate or change XML attributes (e.g., id, lang, dirty). "
-    "3. CONTENT: Translate only the literal text inside <a:t>...</a:t>. "
-    "4. TECHNICAL: Keep all markers like [[HLINK_X]], [[VAR]], or {context} exactly as they are. "
-    "5. OUTPUT: Return ONLY a valid JSON object with the translated XML strings."
+    "3. OUTPUT: Return ONLY a valid JSON object with the translated XML strings."
 )
 
 BATCH_SIZE = 5
