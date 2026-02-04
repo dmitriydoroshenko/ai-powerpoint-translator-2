@@ -13,10 +13,8 @@ SYSTEM_ROLE = (
     "IMPORTANT RULES: "
     "1. STRUCTURE: Do not modify, add, or remove any XML tags (e.g., <a:r>, <a:p>, <a:t>). "
     "2. ATTRIBUTES: Never translate or change XML attributes (e.g., id, lang, dirty). "
-    "3. OUTPUT: Return ONLY a valid JSON object with the translated XML strings."
+    "3. OUTPUT: Return ONLY a valid JSON object with the key 'translated_text'."
 )
-
-BATCH_SIZE = 5
 
 def translate_all(texts):
     if not texts:
@@ -24,31 +22,27 @@ def translate_all(texts):
         return []
 
     start_time = time.perf_counter()
-
     total_texts = len(texts)
-    batches = [texts[i:i + BATCH_SIZE] for i in range(0, total_texts, BATCH_SIZE)]
     translated_result = []
     
     total_prompt_tokens = 0
     total_completion_tokens = 0
     
     print(f"\n{'='*20}")
-    print(f"🚀 НАЧАЛО ПЕРЕВОДА")
-    print(f"Всего строк: {total_texts} (Всего батчей: {len(batches)})")
+    print(f"🚀 НАЧАЛО ПЕРЕВОДА (ПОСТРОЧНО)")
+    print(f"Всего строк: {total_texts}")
     print(f"{'='*20}\n")
 
-    for i, batch in enumerate(batches):
-        print(f"⏳ Обработка батча {i+1}/{len(batches)}... (Строк в батче: {len(batch)})")
+    for i, text in enumerate(texts):
+        original_len = len(text)
+        print(f"⏳ Перевод строки {i+1}/{total_texts} | Длина: {original_len} симв.")
         
-        translations, usage = _translate_batch(batch)
-        translated_result.extend(translations)
+        translated_text, usage = _translate_single(text)
+        translated_result.append(translated_text)
         
         if usage:
             total_prompt_tokens += usage.prompt_tokens
             total_completion_tokens += usage.completion_tokens
-        
-        if i < len(batches) - 1:
-            time.sleep(1) 
 
     end_time = time.perf_counter()
     duration = end_time - start_time
@@ -59,21 +53,20 @@ def translate_all(texts):
 
     print(f"\n\n{'='*20}")
     print(f"✅ ПЕРЕВОД ЗАВЕРШЕН")
-    print(f"Итого обработано строк: {len(translated_result)}/{total_texts}")
+    print(f"Итого обработано строк: {len(translated_result)}")
     print(f"Затраченное время: {minutes} мин. {seconds} сек.")
     print(f"Токены: {total_prompt_tokens + total_completion_tokens} | Общая стоимость: ${cost:.4f}")
     print(f"{'='*20}\n")
 
     return translated_result
-def _translate_batch(batch_texts):
-    payload = {f"item_{i}": text for i, text in enumerate(batch_texts)}
-    
+
+def _translate_single(text):
     try:
         response = client.chat.completions.create(
             model="gpt-5.2",
             messages=[
                 {"role": "system", "content": SYSTEM_ROLE},
-                {"role": "user", "content": f"Translate these items:\n{json.dumps(payload, ensure_ascii=False)}"}
+                {"role": "user", "content": f"Translate this XML text: {text}"}
             ],
             response_format={"type": "json_object"},
             temperature=0.3
@@ -81,13 +74,12 @@ def _translate_batch(batch_texts):
 
         content = response.choices[0].message.content
         if content:
-            translated_data = json.loads(content)
+            data = json.loads(content)
+            translated_text = data.get("translated_text", text)
         else:
-            translated_data = {}
+            translated_text = text
 
-        batch_results = [translated_data.get(f"item_{i}", batch_texts[i]) for i in range(len(batch_texts))]
-
-        return batch_results, response.usage
+        return translated_text, response.usage
     except Exception as e:
-        print(f"Ошибка при обработке батча: {e}")
-        return batch_texts, None
+        print(f"Ошибка при обработке строки: {e}")
+        return text, None
