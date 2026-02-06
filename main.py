@@ -6,6 +6,7 @@ import logging
 from logger_config import setup_logging
 from translator import translate_all
 from file_utils import save_presentation
+from wakepy import keep
 
 setup_logging()
 
@@ -92,4 +93,5 @@ def main():
         logging.info(f"Перевод файла {input_file} завершен")
 
 if __name__ == "__main__":
-    main()
+   with keep.running():
+        main()
