@@ -48,12 +48,11 @@ def translate_all(texts, batch_size=10):
     total_completion_tokens = 0
     
     print(f"\n{'='*40}")
-    print(f"🚀 ЗАПУСК ЛОКАЛИЗАЦИИ (Батчинг: {batch_size} стр/запрос)")
+    print(f"🚀 ЗАПУСК ПЕРЕВОДА (Батчинг: {batch_size} стр/запрос)")
     print(f"Всего строк: {total_texts} | Батчей: {total_batches}")
     print(f"{'='*40}\n")
 
     with ThreadPoolExecutor(max_workers=10) as executor:
-        # Индексируем батчи, чтобы сохранить порядок
         future_to_batch = {
             executor.submit(_translate_batch, [(i + start, texts[i + start]) 
             for i in range(len(batches[b_idx]))]): b_idx 
@@ -98,7 +97,6 @@ def _translate_batch(batch):
     Возвращает список [(index, translated_text), ...] и статистику токенов.
     """
     try:
-        # Подготавливаем данные для отправки: список объектов с ID и текстом
         payload = [{"id": idx, "xml": text} for idx, text in batch]
         
         response = client.chat.completions.create(
@@ -113,22 +111,17 @@ def _translate_batch(batch):
 
         raw_content = response.choices[0].message.content
         
-        # Проверка: если контент пуст, возвращаем оригинальный батч
         if raw_content is None:
             print("⚠️ API вернул пустой ответ (None)")
             return [(idx, text) for idx, text in batch], response.usage
 
-        # Теперь линтер знает, что здесь raw_content — это 100% str
         content = json.loads(raw_content)
         translated_data = content.get("translations", [])
         
-        # Создаем словарь для быстрого поиска перевода по ID
         translations_map = {item['id']: item['translated_text'] for item in translated_data}
         
-        # Собираем результат в том же порядке, в котором пришли данные в батч
         result_batch = []
         for idx, original_text in batch:
-            # Если GPT потерял какой-то ID, возвращаем оригинал
             translated_text = translations_map.get(idx, original_text)
             result_batch.append((idx, translated_text))
             
@@ -136,5 +129,4 @@ def _translate_batch(batch):
 
     except Exception as e:
         print(f"\n❌ Ошибка при обработке батча: {e}")
-        # В случае ошибки возвращаем оригиналы, чтобы скрипт не упал
         return [(idx, text) for idx, text in batch], None

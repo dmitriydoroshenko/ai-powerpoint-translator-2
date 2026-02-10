@@ -18,12 +18,10 @@ def collect_xml_data(prs):
     for s_idx, slide in enumerate(prs.slides):
         for sh_idx, shape in enumerate(slide.shapes):
             
-            # Обработка текстовых фреймов
             if hasattr(shape, "text_frame") and shape.text_frame:
                 xml_contents.append(shape.text_frame._txBody.xml)
                 locations.append(("text_frame", s_idx, sh_idx))
 
-            # Обработка таблиц
             if shape.has_table:
                 for r_idx, row in enumerate(shape.table.rows):
                     for c_idx, cell in enumerate(row.cells):
@@ -37,13 +35,11 @@ def apply_xml_translations(prs, locations, translated_xmls):
     """Заменяет оригинальные XML элементы переведенными."""
     for location, new_xml in zip(locations, translated_xmls):
         try:
-            # Парсим полученную строку обратно в XML объект
             new_element = parse_xml(new_xml)
             
             if location[0] == "text_frame":
                 _, s_idx, sh_idx = location
                 shape = prs.slides[s_idx].shapes[sh_idx]
-                # Заменяем старый _txBody на новый переведенный
                 old_body = shape.text_frame._txBody
                 old_body.getparent().replace(old_body, new_element)
                 
@@ -61,21 +57,12 @@ def process_presentation(input_file):
     
     try:
         prs = Presentation(input_file)
-        
-        # Шаг 1: Сбор XML
         xml_contents, locations = collect_xml_data(prs)
-        
         if not xml_contents:
             logging.info(f"В файле {input_file} текст не найден")
             return
-        
-        # Шаг 2: Перевод
         translated_xmls = translate_all(xml_contents)
-        
-        # Шаг 3: Применение
         apply_xml_translations(prs, locations, translated_xmls)
-        
-        # Шаг 4: Сохранение
         save_presentation(prs, input_file)
         
     except Exception as e:
