@@ -16,25 +16,31 @@ for prefix, uri in NAMESPACES.items():
     ET.register_namespace(prefix, uri)
 
 def collect_xml_data(prs):
-    """Извлекает XML текстовых блоков и таблиц."""
+    """Извлекает XML текстовых блоков, таблиц и заголовков диаграмм."""
     xml_contents = []
     locations = []
 
     for s_idx, slide in enumerate(prs.slides):
         for sh_idx, shape in enumerate(slide.shapes):
             
-            if hasattr(shape, "text_frame") and shape.text_frame:
-                if shape.text_frame.text.strip():
-                    xml_contents.append(shape.text_frame._txBody.xml)
-                    locations.append(("text_frame", s_idx, sh_idx))
-
             if shape.has_table:
                 for r_idx, row in enumerate(shape.table.rows):
                     for c_idx, cell in enumerate(row.cells):
-                        if hasattr(cell, "text_frame") and cell.text_frame:
-                            if cell.text_frame.text.strip():
-                                xml_contents.append(cell.text_frame._txBody.xml)
-                                locations.append(("table_cell", s_idx, sh_idx, r_idx, c_idx))
+                        if cell.text_frame and cell.text_frame.text.strip():
+                            xml_contents.append(cell.text_frame._txBody.xml)
+                            locations.append(("table_cell", s_idx, sh_idx, r_idx, c_idx))
+
+            elif shape.has_chart:
+                chart = shape.chart
+                if chart.has_title and chart.chart_title.has_text_frame:
+                    if chart.chart_title.text_frame.text.strip():
+                        xml_contents.append(chart.chart_title.text_frame._txBody.xml)
+                        locations.append(("chart_title", s_idx, sh_idx))
+
+            elif hasattr(shape, "text_frame") and shape.text_frame:
+                if shape.text_frame.text.strip():
+                    xml_contents.append(shape.text_frame._txBody.xml)
+                    locations.append(("text_frame", s_idx, sh_idx))
     
     return xml_contents, locations
 
@@ -54,6 +60,13 @@ def apply_xml_translations(prs, locations, translated_xmls):
                 cell = prs.slides[s_idx].shapes[sh_idx].table.rows[r_idx].cells[c_idx]
                 old_txBody = cell.text_frame._txBody
                 old_txBody.getparent().replace(old_txBody, new_txBody)
+
+            elif location[0] == "chart_title":
+                _, s_idx, sh_idx = location
+                chart = prs.slides[s_idx].shapes[sh_idx].chart
+                old_txBody = chart.chart_title.text_frame._txBody
+                old_txBody.getparent().replace(old_txBody, new_txBody)
+
         except Exception as e:
             logging.error(f"Ошибка вставки в {location}: {e}")
 
