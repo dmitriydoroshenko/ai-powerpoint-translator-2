@@ -24,15 +24,17 @@ def collect_xml_data(prs):
         for sh_idx, shape in enumerate(slide.shapes):
             
             if hasattr(shape, "text_frame") and shape.text_frame:
-                xml_contents.append(shape.text_frame._txBody.xml)
-                locations.append(("text_frame", s_idx, sh_idx))
+                if shape.text_frame.text.strip():
+                    xml_contents.append(shape.text_frame._txBody.xml)
+                    locations.append(("text_frame", s_idx, sh_idx))
 
             if shape.has_table:
                 for r_idx, row in enumerate(shape.table.rows):
                     for c_idx, cell in enumerate(row.cells):
                         if hasattr(cell, "text_frame") and cell.text_frame:
-                            xml_contents.append(cell.text_frame._txBody.xml)
-                            locations.append(("table_cell", s_idx, sh_idx, r_idx, c_idx))
+                            if cell.text_frame.text.strip():
+                                xml_contents.append(cell.text_frame._txBody.xml)
+                                locations.append(("table_cell", s_idx, sh_idx, r_idx, c_idx))
     
     return xml_contents, locations
 
