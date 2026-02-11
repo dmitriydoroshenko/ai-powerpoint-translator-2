@@ -61,7 +61,19 @@ def process_presentation(input_file):
         if not xml_contents:
             logging.info(f"В файле {input_file} текст не найден")
             return
+
+        logging.info(f"ПОДГОТОВКА К ОТПРАВКЕ: Найдено элементов для перевода: {len(xml_contents)}")
+        for i, (loc, xml_content) in enumerate(zip(locations, xml_contents)):
+            logging.info(f"--- ОТПРАВЛЯЕМЫЙ XML (Элемент {i}, Локация {loc}) ---")
+            logging.info(f"\n{xml_content}\n" + "-"*50)
+
         translated_xmls = translate_all(xml_contents)
+        
+        logging.info(f"ОТВЕТ ПОЛУЧЕН: Переведено элементов: {len(translated_xmls)}")
+        # for i, t_xml in enumerate(translated_xmls):
+        #    logging.info(f"--- ПОЛУЧЕННЫЙ XML (Элемент {i}) ---")
+        #    logging.info(f"\n{t_xml}\n" + "-"*50)
+
         apply_xml_translations(prs, locations, translated_xmls)
         save_presentation(prs, input_file)
         
