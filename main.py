@@ -37,24 +37,23 @@ def collect_xml_data(prs):
     return xml_contents, locations
 
 def apply_xml_translations(prs, locations, translated_xmls):
-    """Заменяет оригинальные XML элементы переведенными."""
     for location, new_xml in zip(locations, translated_xmls):
         try:
-            new_element = parse_xml(new_xml)
+            new_txBody = parse_xml(new_xml)
             
             if location[0] == "text_frame":
                 _, s_idx, sh_idx = location
                 shape = prs.slides[s_idx].shapes[sh_idx]
-                old_body = shape.text_frame._txBody
-                old_body.getparent().replace(old_body, new_element)
+                old_txBody = shape.text_frame._txBody
+                old_txBody.getparent().replace(old_txBody, new_txBody)
                 
             elif location[0] == "table_cell":
                 _, s_idx, sh_idx, r_idx, c_idx = location
                 cell = prs.slides[s_idx].shapes[sh_idx].table.rows[r_idx].cells[c_idx]
-                old_body = cell.text_frame._txBody
-                old_body.getparent().replace(old_body, new_element)
+                old_txBody = cell.text_frame._txBody
+                old_txBody.getparent().replace(old_txBody, new_txBody)
         except Exception as e:
-            logging.error(f"Ошибка при вставке XML в {location}: {e}")
+            logging.error(f"Ошибка вставки в {location}: {e}")
 
 def process_presentation(input_file):
     logging.info(f"Обработка файла: {input_file}")
