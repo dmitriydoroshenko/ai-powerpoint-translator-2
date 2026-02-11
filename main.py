@@ -7,8 +7,18 @@ from logger_config import setup_logging
 from translator import translate_all
 from file_utils import save_presentation
 from wakepy import keep
+import xml.etree.ElementTree as ET
 
 setup_logging()
+
+# Регистрируем пространства имен, чтобы ElementTree не переименовывал их в ns0, ns1 и т.д.
+NAMESPACES = {
+    'p': 'http://schemas.openxmlformats.org/presentationml/2006/main',
+    'a': 'http://schemas.openxmlformats.org/drawingml/2006/main',
+    'r': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+}
+for prefix, uri in NAMESPACES.items():
+    ET.register_namespace(prefix, uri)
 
 def collect_xml_data(prs):
     """Извлекает XML текстовых блоков и таблиц."""
@@ -51,6 +61,36 @@ def apply_xml_translations(prs, locations, translated_xmls):
         except Exception as e:
             logging.error(f"Ошибка при вставке XML в {location}: {e}")
 
+def strip_and_store_metadata(xml_string):
+    """Вырезает служебные теги и возвращает чистый XML для перевода + объект метаданных."""
+    root = ET.fromstring(xml_string)
+    
+    body_pr = root.find('a:bodyPr', NAMESPACES)
+    lst_style = root.find('a:lstStyle', NAMESPACES)
+    
+    metadata = {
+        'body_pr': body_pr,
+        'lst_style': lst_style
+    }
+
+    if body_pr is not None:
+        root.remove(body_pr)
+    if lst_style is not None:
+        root.remove(lst_style)
+        
+    return ET.tostring(root, encoding='unicode'), metadata
+
+def restore_metadata(translated_xml_string, metadata):
+    """Вставляет служебные теги обратно в переведенный XML."""
+    root = ET.fromstring(translated_xml_string)
+    
+    if metadata['lst_style'] is not None:
+        root.insert(0, metadata['lst_style'])
+    if metadata['body_pr'] is not None:
+        root.insert(0, metadata['body_pr'])
+        
+    return ET.tostring(root, encoding='unicode')
+
 def process_presentation(input_file):
     logging.info(f"Обработка файла: {input_file}")
     print(f"\nОбработка файла: {os.path.basename(input_file)}")
@@ -58,23 +98,43 @@ def process_presentation(input_file):
     try:
         prs = Presentation(input_file)
         xml_contents, locations = collect_xml_data(prs)
+        
         if not xml_contents:
             logging.info(f"В файле {input_file} текст не найден")
             return
 
-        logging.info(f"ПОДГОТОВКА К ОТПРАВКЕ: Найдено элементов для перевода: {len(xml_contents)}")
-        for i, (loc, xml_content) in enumerate(zip(locations, xml_contents)):
-            logging.info(f"--- ОТПРАВЛЯЕМЫЙ XML (Элемент {i}, Локация {loc}) ---")
-            logging.info(f"\n{xml_content}\n" + "-"*50)
-
-        translated_xmls = translate_all(xml_contents)
+        # --- Очистка XML перед отправкой ---
+        stripped_xmls = []
+        metadata_store = []
         
-        logging.info(f"ОТВЕТ ПОЛУЧЕН: Переведено элементов: {len(translated_xmls)}")
-        # for i, t_xml in enumerate(translated_xmls):
-        #    logging.info(f"--- ПОЛУЧЕННЫЙ XML (Элемент {i}) ---")
-        #    logging.info(f"\n{t_xml}\n" + "-"*50)
+        for xml_content in xml_contents:
+            clean_xml, meta = strip_and_store_metadata(xml_content)
+            stripped_xmls.append(clean_xml)
+            metadata_store.append(meta)
 
-        apply_xml_translations(prs, locations, translated_xmls)
+        logging.info(f"ПОДГОТОВКА: Найдено элементов: {len(stripped_xmls)}")
+        for i, (loc, s_xml) in enumerate(zip(locations, stripped_xmls)):
+            logging.info(f"--- ОТПРАВЛЯЕМЫЙ ОЧИЩЕННЫЙ XML (Элемент {i}, Локация {loc}) ---")
+            logging.info(f"\n{s_xml}\n" + "-"*50)
+        # ----------------------------------------------
+
+        translated_stripped_xmls = translate_all(stripped_xmls)
+        
+        logging.info(f"ОТВЕТ ПОЛУЧЕН: Переведено элементов: {len(translated_stripped_xmls)}")
+
+        # --- Восстановление метаданных ---
+        final_xmls = []
+        for t_xml, meta in zip(translated_stripped_xmls, metadata_store):
+            try:
+                restored_xml = restore_metadata(t_xml, meta)
+                final_xmls.append(restored_xml)
+            except Exception as e:
+                logging.error(f"Ошибка при восстановлении метаданных: {e}")
+                # Если восстановление не удалось, пробуем использовать то, что пришло
+                final_xmls.append(t_xml)
+        # ----------------------------------------------
+
+        apply_xml_translations(prs, locations, final_xmls)
         save_presentation(prs, input_file)
         
     except Exception as e:
