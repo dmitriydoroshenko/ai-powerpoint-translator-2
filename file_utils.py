@@ -1,10 +1,9 @@
 import os
 
 def save_presentation(prs, original_filename, callback=None):
-    """Сохраняет презентацию с созданием уникального имени файла и выводом логов."""
+    """Сохраняет презентацию в ту же папку, где лежит оригинал."""
 
-    output_dir = 'output'
-    os.makedirs(output_dir, exist_ok=True)
+    output_dir = os.path.dirname(os.path.abspath(original_filename))
     
     base_name = os.path.basename(original_filename)
     name_without_ext = os.path.splitext(base_name)[0]
@@ -20,7 +19,7 @@ def save_presentation(prs, original_filename, callback=None):
 
     try:
         prs.save(output_filename)
-        message = f"💾 Файл сохранен: {output_filename}"
+        message = f"💾 Файл сохранен рядом с оригиналом: {output_filename}"
         print(message)
         if callback:
             callback(message)
@@ -30,4 +29,4 @@ def save_presentation(prs, original_filename, callback=None):
         print(error_msg)
         if callback:
             callback(error_msg)
-        raise
+        raise e
