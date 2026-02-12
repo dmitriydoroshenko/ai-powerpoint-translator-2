@@ -3,12 +3,9 @@ import logging
 from pptx import Presentation
 from pptx.oxml import parse_xml
 from wakepy import keep
-from logger_config import setup_logging
 from translator import translate_all
 from file_utils import save_presentation
 from xml_handler import XMLMetadataHandler
-
-setup_logging()
 
 def collect_translatable_items(prs):
     """Собирает все объекты для перевода и их типы в плоский список."""
@@ -51,13 +48,12 @@ def process_presentation(input_file):
     Выполняет полный цикл обработки PPTX: извлечение текста, 
     перевод фреймов и элементов графиков, сохранение результата.
     """
-    logging.info(f"Обработка файла: {input_file}")
     try:
         prs = Presentation(input_file)
         work_items = collect_translatable_items(prs)
         
         if not work_items:
-            logging.info(f"Нет текста для перевода в {input_file}")
+            print(f"Нет текста для перевода в {input_file}")
             return
 
         to_translate = []
@@ -85,7 +81,7 @@ def process_presentation(input_file):
                 else:
                     obj.text = translated_text
             except Exception as e:
-                logging.error(f"Ошибка применения перевода: {e}")
+                print(f"Ошибка применения перевода: {e}")
 
         save_presentation(prs, input_file)
         
