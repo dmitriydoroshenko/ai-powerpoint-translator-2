@@ -2,11 +2,23 @@ import os
 import json
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dotenv import load_dotenv
 from openai import OpenAI
 
-load_dotenv()
-client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+client = None
+
+def set_api_key(api_key):
+    """Инициализирует клиента OpenAI."""
+    global client
+    client = OpenAI(api_key=api_key)
+
+def validate_api_key(api_key):
+    """Проверка ключа без списания токенов за генерацию."""
+    try:
+        test_client = OpenAI(api_key=api_key)
+        test_client.models.list()
+        return True, ""
+    except Exception as e:
+        return False, str(e)
 
 TECHNICAL_INSTRUCTIONS = (
     "## Technical Role\n"
@@ -40,8 +52,12 @@ def translate_all(texts, batch_size=10, status_callback=None):
         if status_callback:
             status_callback(message)
 
+    if client is None:
+        log("❌ Ошибка: API клиент не настроен.")
+        return texts
+
     if not texts:
-        log("❌ Список текстов пуст.")
+        log("⚠️ Нет текста для перевода.")
         return []
 
     start_time = time.perf_counter()
@@ -99,7 +115,10 @@ def translate_all(texts, batch_size=10, status_callback=None):
     return results
 
 def _translate_batch(batch, log_func):
-    """Принимает список кортежей и функцию логирования. Аргумент log_func обязателен."""
+    """Выполняет перевод батча"""
+    if client is None:
+        log_func("❌ Ошибка: клиент не инициализирован")
+        return batch, None
 
     try:
         payload = [{"id": idx, "xml": text} for idx, text in batch]
@@ -113,25 +132,17 @@ def _translate_batch(batch, log_func):
             response_format={"type": "json_object"},
             temperature=0.1
         )
-
-        raw_content = response.choices[0].message.content
         
-        if raw_content is None:
-            log_func("⚠️ API вернул пустой ответ (None)")
-            return [(idx, text) for idx, text in batch], response.usage
+        content_raw = response.choices[0].message.content
+        if content_raw is None:
+            return batch, response.usage
 
-        content = json.loads(raw_content)
-        translated_data = content.get("translations", [])
+        res_data = json.loads(content_raw)
+        translations = res_data.get("translations", [])
+        t_map = {item['id']: item['translated_text'] for item in translations}
         
-        translations_map = {item['id']: item['translated_text'] for item in translated_data}
+        return [(idx, t_map.get(idx, original)) for idx, original in batch], response.usage
         
-        result_batch = []
-        for idx, original_text in batch:
-            translated_text = translations_map.get(idx, original_text)
-            result_batch.append((idx, translated_text))
-            
-        return result_batch, response.usage
-
     except Exception as e:
         log_func(f"❌ Ошибка в батче: {str(e)}")
-        return [(idx, text) for idx, text in batch], None
+        return batch, None
