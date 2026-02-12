@@ -52,7 +52,6 @@ class MainWindow(QMainWindow):
                 if is_valid:
                     set_api_key(api_key)
                     self.log_output.clear()
-                    self.update_log("✅ API ключ подтвержден и готов к работе.")
                     break
                 else:
                     self.update_log(f"❌ Сохраненный ключ невалиден: {error_msg}")
@@ -128,7 +127,8 @@ class MainWindow(QMainWindow):
         if file:
             self.selected_file = file
             self.btn_start.setEnabled(True)
-            self.info_label.setText(f"Выбран: {os.path.basename(file)}")
+            self.log_output.clear()
+            self.update_log(f"📁 Выбран файл: {os.path.basename(file)}")
 
     def run_translation(self):
         """Запуск процесса в отдельном потоке."""
