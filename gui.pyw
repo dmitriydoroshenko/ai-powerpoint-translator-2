@@ -105,6 +105,7 @@ class MainWindow(QMainWindow):
 
         self.btn_start = QPushButton("🚀 Начать перевод")
         self.btn_start.setEnabled(False)
+        self.btn_browse.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_start.setStyleSheet("""
             QPushButton { 
                 background-color: #2ecc71; 
@@ -137,12 +138,12 @@ class MainWindow(QMainWindow):
     def run_translation(self):
         """Запуск процесса в отдельном потоке."""
         self.btn_start.setEnabled(False)
-        self.btn_start.setCursor(Qt.CursorShape.ArrowCursor)
         self.btn_browse.setEnabled(False)
         
         self.worker = TranslationWorker(self.selected_file)
         self.worker.log_signal.connect(self.update_log)
         self.worker.finished_signal.connect(self.on_finished)
+        self.worker.finished.connect(self.worker.deleteLater) 
         self.worker.start()
 
     def update_log(self, text):
@@ -153,7 +154,6 @@ class MainWindow(QMainWindow):
     def on_finished(self):
         """Разблокировка интерфейса по завершении."""
         self.btn_start.setEnabled(True)
-        self.btn_start.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_browse.setEnabled(True)
 
 if __name__ == "__main__":
