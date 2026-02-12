@@ -34,9 +34,14 @@ LOCALIZATION_GUIDELINES = (
 
 SYSTEM_ROLE = f"{TECHNICAL_INSTRUCTIONS}\n{LOCALIZATION_GUIDELINES}"
 
-def translate_all(texts, batch_size=10):
+def translate_all(texts, batch_size=10, status_callback=None):
+    def log(message):
+        print(message)  # Оставляем вывод в консоль для отладки
+        if status_callback:
+            status_callback(message)
+
     if not texts:
-        print("❌ Список текстов пуст.")
+        log("❌ Список текстов пуст.")
         return []
 
     start_time = time.perf_counter()
@@ -49,10 +54,10 @@ def translate_all(texts, batch_size=10):
     total_prompt_tokens = 0
     total_completion_tokens = 0
     
-    print(f"\n{'='*40}")
-    print(f"🚀 ЗАПУСК ПЕРЕВОДА (Батчинг: {batch_size} стр/запрос)")
-    print(f"Всего строк: {total_texts} | Батчей: {total_batches}")
-    print(f"{'='*40}\n")
+    log(f"\n{'='*40}")
+    log(f"🚀 ЗАПУСК ПЕРЕВОДА (Батчинг: {batch_size} стр/запрос)")
+    log(f"Всего строк: {total_texts} | Батчей: {total_batches}")
+    log(f"{'='*40}\n")
 
     with ThreadPoolExecutor(max_workers=10) as executor:
         future_to_batch = {
@@ -75,7 +80,7 @@ def translate_all(texts, batch_size=10):
             completed_batches += 1
 
             percent = (completed_batches / total_batches) * 100
-            print(f"⏳ Батч {completed_batches}/{total_batches} завершен ({percent:.1f}%) | "
+            log(f"⏳ Батч {completed_batches}/{total_batches} завершен ({percent:.1f}%) | "
                   f"Строк обработано: {min(completed_batches * batch_size, total_texts)}")
 
     end_time = time.perf_counter()
@@ -84,12 +89,12 @@ def translate_all(texts, batch_size=10):
 
     cost = (total_prompt_tokens * 1.75 / 1_000_000) + (total_completion_tokens * 14.00 / 1_000_000)
 
-    print(f"\n{'='*40}")
-    print(f"✅ ПЕРЕВОД ЗАВЕРШЕН")
-    print(f"⏱ Время: {minutes} мин. {seconds} сек.")
-    print(f"📊 Токены: Промпт: {total_prompt_tokens} | Ответ: {total_completion_tokens}")
-    print(f"💰 Ориентировочная стоимость: ${cost:.4f}")
-    print(f"{'='*40}\n")
+    log(f"\n{'='*40}")
+    log(f"✅ ПЕРЕВОД ЗАВЕРШЕН")
+    log(f"⏱ Время: {minutes} мин. {seconds} сек.")
+    log(f"📊 Токены: Промпт: {total_prompt_tokens} | Ответ: {total_completion_tokens}")
+    log(f"💰 Ориентировочная стоимость: ${cost:.4f}")
+    log(f"{'='*40}\n")
 
     return results
 

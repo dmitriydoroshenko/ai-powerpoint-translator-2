@@ -1,7 +1,7 @@
 import os
 
-def save_presentation(prs, original_filename):
-    """Сохраняет презентацию с созданием уникального имени файла."""
+def save_presentation(prs, original_filename, callback=None):
+    """Сохраняет презентацию с созданием уникального имени файла и выводом логов."""
 
     output_dir = 'output'
     os.makedirs(output_dir, exist_ok=True)
@@ -20,8 +20,14 @@ def save_presentation(prs, original_filename):
 
     try:
         prs.save(output_filename)
-        print(f"✅ Файл сохранен: {output_filename}")
+        message = f"💾 Файл сохранен: {output_filename}"
+        print(message)
+        if callback:
+            callback(message)
         return output_filename
     except Exception as e:
-        print(f"Ошибка при записи: {e}")
+        error_msg = f"❌ Ошибка при записи {output_filename}: {e}"
+        print(error_msg)
+        if callback:
+            callback(error_msg)
         raise

@@ -1,4 +1,5 @@
 import glob
+import os
 from pptx import Presentation
 from pptx.oxml import parse_xml
 from wakepy import keep
@@ -44,17 +45,22 @@ def collect_translatable_items(prs):
                     
     return items
 
-def process_presentation(input_file):
+def process_presentation(input_file, callback=None):
     """
     Выполняет полный цикл обработки PPTX: извлечение текста, 
     перевод фреймов и элементов графиков, сохранение результата.
     """
+    def log(message):
+        print(message)
+        if callback:
+            callback(message)
+
     try:
         prs = Presentation(input_file)
         work_items = collect_translatable_items(prs)
         
         if not work_items:
-            print(f"Нет текста для перевода в {input_file}")
+            log(f"⚠️ Нет текста для перевода в {os.path.basename(input_file)}")
             return
 
         to_translate = []
@@ -69,7 +75,7 @@ def process_presentation(input_file):
                 to_translate.append(obj.text)
                 handlers.append(None)
 
-        translated_results = translate_all(to_translate)
+        translated_results = translate_all(to_translate, status_callback=callback)
 
         for (obj, kind), handler, translated_text in zip(work_items, handlers, translated_results):
             if not translated_text:
@@ -82,14 +88,16 @@ def process_presentation(input_file):
                 else:
                     obj.text = translated_text
             except Exception as e:
-                print(f"❌ Ошибка применения перевода: {e}")
+                log(f"❌ Ошибка применения перевода в элементе: {e}")
 
-        save_presentation(prs, input_file)
+        save_presentation(prs, input_file, callback=callback)
         
     except Exception as e:
-        print(f"❌ Критическая ошибка в {input_file}: {e}")
+        log(f"❌ Критическая ошибка в {os.path.basename(input_file)}: {e}")
+        raise e
 
 def main():
+    """Запуск через консоль"""
     for input_file in glob.glob('input/*.pptx'):
         process_presentation(input_file)
 
