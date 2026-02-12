@@ -1,5 +1,4 @@
 import glob
-import logging
 from pptx import Presentation
 from pptx.oxml import parse_xml
 from wakepy import keep
@@ -81,12 +80,12 @@ def process_presentation(input_file):
                 else:
                     obj.text = translated_text
             except Exception as e:
-                print(f"Ошибка применения перевода: {e}")
+                print(f"❌ Ошибка применения перевода: {e}")
 
         save_presentation(prs, input_file)
         
     except Exception as e:
-        logging.error(f"Критическая ошибка в {input_file}: {e}")
+        print(f"❌ Критическая ошибка в {input_file}: {e}")
 
 def main():
     for input_file in glob.glob('input/*.pptx'):
