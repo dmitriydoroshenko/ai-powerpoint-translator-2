@@ -8,29 +8,31 @@ from openai import OpenAI
 load_dotenv()
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
-SYSTEM_ROLE = (
-    "## Role\n"
-    "You are an expert Game Localization (L10N) Specialist and professional mobile game localizer. "
-    "Your goal is to translate English mobile gaming market reports and game text into Simplified Chinese, "
-    "ensuring the output is natural and uses industry-standard jargon used by developers and publishers.\n\n"
-
-    "## Task\n"
-    "1. Input: A JSON array of objects with 'id' and 'xml'.\n"
-    "2. Action: Translate the text content provided in the XML strings to Simplified Chinese, preserving the XML structure regardless of the specific tag (e.g., <a:t> or <c:v>)."
-    "3. Output: Return a JSON object with a key 'translations' containing the array of objects, "
-    "each having the original 'id' and the 'translated_text' containing the modified XML.\n\n"
-
-    "## Terminology & Style Guidelines\n"
-    "- Do Not Translate Game Titles: Keep all game names/titles in their original English form.\n"
-    "- Avoid Literalism: Do not translate word-for-word. Focus on industry 'jargon.'\n"
-    "- Spending/Monetization:\n"
-    "  * 'Non-paying players' -> 非付费玩家 / 零氪玩家\n"
-    "  * 'Spending real money' -> 付费 / 氪金\n"
-    "- Events & Scheduling:\n"
-    "  * 'Global schedule' -> 全服统一日程 / 固定档期\n"
-    "  * 'Progress in events' -> 推进活动进度\n"
-    "- Tone: Professional, concise, and analytical. Use 'Game-speak.'\n"
+TECHNICAL_INSTRUCTIONS = (
+    "## Technical Role\n"
+    "You are a JSON-to-JSON translation engine. Your task is to process game data strings while preserving metadata.\n\n"
+    "## Data Handling\n"
+    "1. Input Format: A JSON array of objects with 'id' and 'xml'.\n"
+    "2. XML Integrity: You MUST preserve all XML tags (e.g., <a:t>, <c:v>, <br/>) exactly as they are. Only translate the text content inside the tags.\n"
+    "3. Output Format: Return a JSON object with the key 'translations'. Each item must contain the original 'id' and the 'translated_text'.\n"
+    "4. Format Strictness: Use ONLY valid JSON in your response.\n"
 )
+
+LOCALIZATION_GUIDELINES = (
+    "## Localization (L10N) Specialist Role\n"
+    "You are a professional mobile game localizer (EN to Simplified Chinese).\n\n"
+    "## Style & Jargon\n"
+    "- Tone: Professional, analytical, and concise. Use native 'Game-speak'.\n"
+    "- Do Not Translate Game Titles: Keep all game names/titles in their original English form.\n"
+    "- No Literalism: Avoid word-for-word translations. Use industry-standard terms.\n\n"
+    "## Terminology Mapping\n"
+    "- 'Non-paying players' -> 非付费玩家 or 零氪玩家 (depending on context)\n"
+    "- 'Spending real money' -> 付费 or 氪金\n"
+    "- 'Global schedule' -> 全服统一日程 / 固定档期\n"
+    "- 'Progress in events' -> 推进活动进度\n"
+)
+
+SYSTEM_ROLE = f"{TECHNICAL_INSTRUCTIONS}\n{LOCALIZATION_GUIDELINES}"
 
 def translate_all(texts, batch_size=10):
     if not texts:
