@@ -22,7 +22,7 @@ def get_text_frames(prs):
                         frames.append((cell.text_frame, ("table_cell", s_idx, sh_idx, r_idx, c_idx)))
             
             elif shape.has_chart:
-                chart = shape.chart
+                chart = getattr(shape, 'chart')
                 if chart.has_title and chart.chart_title.has_text_frame:
                     frames.append((chart.chart_title.text_frame, ("chart_title", s_idx, sh_idx)))
                 
@@ -41,33 +41,58 @@ def get_text_frames(prs):
                 if tf and tf.text.strip():
                     yield tf, loc
 
+def get_chart_text_nodes(chart):
+    """
+    Извлекает все возможные XML-узлы с текстом из диаграммы:
+    кэш данных, названия рядов и текстовые фреймы внутри серий.
+    """
+    nodes = []
+    nodes.extend(chart._element.xpath('.//c:tx//c:v | .//c:cat//c:v'))
+    rich_nodes = chart._element.xpath('.//c:tx//a:t | .//c:cat//a:t')
+    nodes.extend(rich_nodes)
+    
+    return nodes
+
 def process_presentation(input_file):
     """
-    Выполняет полный цикл обработки PPTX файла: извлечение текста, 
-    перевод через XML-хендлеры с сохранением форматирования и сохранение результата.
+    Выполняет полный цикл обработки PPTX: извлечение текста, 
+    перевод фреймов и элементов графиков, сохранение результата.
     """
     logging.info(f"Обработка файла: {input_file}")
     try:
         prs = Presentation(input_file)
         
         items = list(get_text_frames(prs))
-        if not items:
+        text_frames, _ = zip(*items) if items else ([], [])
+        
+        chart_nodes = []
+
+        for slide in prs.slides:
+            for shape in slide.shapes:
+                if shape.has_chart:
+                    chart_nodes.extend(get_chart_text_nodes(getattr(shape, 'chart')))
+
+        handlers = [XMLMetadataHandler(tf._txBody.xml) for tf in text_frames]
+        chart_texts = [node.text for node in chart_nodes if node.text]
+        to_translate = [h.strip() for h in handlers] + chart_texts
+        
+        if not to_translate:
+            logging.info(f"Нет текста для перевода в {input_file}")
             return
 
-        text_frames, locations = zip(*items)
-        handlers = [XMLMetadataHandler(tf._txBody.xml) for tf in text_frames]
-        stripped_xmls = [h.strip() for h in handlers]
-
-        translated_xmls = translate_all(stripped_xmls)
-
-        for tf, handler, t_xml, loc in zip(text_frames, handlers, translated_xmls, locations):
+        translated_all = translate_all(to_translate)
+        offset = len(handlers)
+        
+        for tf, handler, t_xml in zip(text_frames, handlers, translated_all[:offset]):
             try:
-                restored_xml = handler.restore(t_xml)
-                new_txBody = parse_xml(restored_xml)
-                old_txBody = tf._txBody
-                old_txBody.getparent().replace(old_txBody, new_txBody)
+                new_txBody = parse_xml(handler.restore(t_xml))
+                tf._txBody.getparent().replace(tf._txBody, new_txBody)
             except Exception as e:
-                logging.error(f"Ошибка в {loc}: {e}")
+                logging.error(f"Ошибка восстановления фрейма: {e}")
+
+        for node, t_text in zip(chart_nodes, translated_all[offset:]):
+            if t_text:
+                node.text = t_text
 
         save_presentation(prs, input_file)
         
