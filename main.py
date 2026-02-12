@@ -20,11 +20,13 @@ def collect_translatable_items(prs):
             
             elif shape.has_chart:
                 chart = shape.chart
-                nodes = chart._element.xpath('.//c:tx//c:v | .//c:cat//c:v | .//c:tx//a:t | .//c:cat//a:t')
+                nodes = chart._element.xpath('.//c:v | .//a:t') 
+                
                 for node in nodes:
                     if node.text and node.text.strip():
-                        items.append((node, "xml_node"))
-                
+                        if not node.text.replace('.', '', 1).isdigit():
+                            items.append((node, "xml_node"))
+
                 if chart.has_title and chart.chart_title.has_text_frame:
                     items.append((chart.chart_title.text_frame, "frame"))
                 

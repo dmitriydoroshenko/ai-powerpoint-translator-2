@@ -16,7 +16,7 @@ SYSTEM_ROLE = (
 
     "## Task\n"
     "1. Input: A JSON array of objects with 'id' and 'xml'.\n"
-    "2. Action: Translate ONLY the text content within <a:t> tags in the provided XML to Simplified Chinese.\n"
+    "2. Action: Translate the text content provided in the XML strings to Simplified Chinese, preserving the XML structure regardless of the specific tag (e.g., <a:t> or <c:v>)."
     "3. Output: Return a JSON object with a key 'translations' containing the array of objects, "
     "each having the original 'id' and the 'translated_text' containing the modified XML.\n\n"
 
