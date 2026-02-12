@@ -1,161 +1,83 @@
-import os
 import glob
+import logging
 from pptx import Presentation
 from pptx.oxml import parse_xml
-import logging
+from wakepy import keep
 from logger_config import setup_logging
 from translator import translate_all
 from file_utils import save_presentation
-from wakepy import keep
-import xml.etree.ElementTree as ET
-from xml_handler import XMLMetadataHandler, NAMESPACES
+from xml_handler import XMLMetadataHandler
 
 setup_logging()
 
-for prefix, uri in NAMESPACES.items():
-    ET.register_namespace(prefix, uri)
-
-def collect_xml_data(prs):
-    """Извлекает XML текстовых блоков, таблиц и заголовков диаграмм."""
-    xml_contents = []
-    locations = []
-
+def get_text_frames(prs):
+    """Генератор, возвращающий все текстовые фреймы и их метаданные."""
     for s_idx, slide in enumerate(prs.slides):
         for sh_idx, shape in enumerate(slide.shapes):
+            frames = []
             
             if shape.has_table:
                 for r_idx, row in enumerate(shape.table.rows):
                     for c_idx, cell in enumerate(row.cells):
-                        if cell.text_frame and cell.text_frame.text.strip():
-                            xml_contents.append(cell.text_frame._txBody.xml)
-                            locations.append(("table_cell", s_idx, sh_idx, r_idx, c_idx))
-
+                        frames.append((cell.text_frame, ("table_cell", s_idx, sh_idx, r_idx, c_idx)))
+            
             elif shape.has_chart:
                 chart = shape.chart
-
                 if chart.has_title and chart.chart_title.has_text_frame:
-                    if chart.chart_title.text_frame.text.strip():
-                        xml_contents.append(chart.chart_title.text_frame._txBody.xml)
-                        locations.append(("chart_title", s_idx, sh_idx))
+                    frames.append((chart.chart_title.text_frame, ("chart_title", s_idx, sh_idx)))
                 
-                try:
-                    cat_axis = chart.category_axis 
-                    if cat_axis and cat_axis.has_title:
-                        tx_frame = cat_axis.axis_title.text_frame
-                        if tx_frame.text.strip():
-                            xml_contents.append(tx_frame._txBody.xml)
-                            locations.append(("chart_axis_cat", s_idx, sh_idx))
-                except ValueError:
-                    pass
-
-                try:
-                    val_axis = chart.value_axis
-                    if val_axis and val_axis.has_title:
-                        tx_frame = val_axis.axis_title.text_frame
-                        if tx_frame.text.strip():
-                            xml_contents.append(tx_frame._txBody.xml)
-                            locations.append(("chart_axis_val", s_idx, sh_idx))
-                except ValueError:
-                    pass
-
-            elif hasattr(shape, "text_frame") and shape.text_frame:
-                if shape.text_frame.text.strip():
-                    xml_contents.append(shape.text_frame._txBody.xml)
-                    locations.append(("text_frame", s_idx, sh_idx))
-    
-    return xml_contents, locations
-
-def apply_xml_translations(prs, locations, translated_xmls):
-    for location, new_xml in zip(locations, translated_xmls):
-        try:
-            new_txBody = parse_xml(new_xml)
-            loc_type = location[0]
-            s_idx = location[1]
-            sh_idx = location[2]
-            slide = prs.slides[s_idx]
-            shape = slide.shapes[sh_idx]
+                for axis_type in ['category_axis', 'value_axis']:
+                    try:
+                        axis = getattr(chart, axis_type)
+                        if axis.has_title:
+                            frames.append((axis.axis_title.text_frame, (f"chart_{axis_type}", s_idx, sh_idx)))
+                    except (ValueError, AttributeError):
+                        continue
             
-            if loc_type == "text_frame":
-                old_txBody = shape.text_frame._txBody
-                old_txBody.getparent().replace(old_txBody, new_txBody)
-                
-            elif loc_type == "table_cell":
-                r_idx, c_idx = location[3], location[4]
-                cell = shape.table.rows[r_idx].cells[c_idx]
-                old_txBody = cell.text_frame._txBody
-                old_txBody.getparent().replace(old_txBody, new_txBody)
+            elif hasattr(shape, "text_frame") and shape.text_frame:
+                frames.append((shape.text_frame, ("text_frame", s_idx, sh_idx)))
 
-            elif loc_type == "chart_title":
-                old_txBody = shape.chart.chart_title.text_frame._txBody
-                old_txBody.getparent().replace(old_txBody, new_txBody)
-
-            elif loc_type == "chart_axis_cat":
-                old_txBody = shape.chart.category_axis.axis_title.text_frame._txBody
-                old_txBody.getparent().replace(old_txBody, new_txBody)
-
-            elif loc_type == "chart_axis_val":
-                old_txBody = shape.chart.value_axis.axis_title.text_frame._txBody
-                old_txBody.getparent().replace(old_txBody, new_txBody)
-
-        except Exception as e:
-            logging.error(f"Ошибка вставки в {location}: {e}")
+            for tf, loc in frames:
+                if tf and tf.text.strip():
+                    yield tf, loc
 
 def process_presentation(input_file):
+    """
+    Выполняет полный цикл обработки PPTX файла: извлечение текста, 
+    перевод через XML-хендлеры с сохранением форматирования и сохранение результата.
+    """
     logging.info(f"Обработка файла: {input_file}")
-    print(f"\nОбработка файла: {os.path.basename(input_file)}")
-    
     try:
         prs = Presentation(input_file)
-        xml_contents, locations = collect_xml_data(prs)
         
-        if not xml_contents:
-            logging.info(f"В файле {input_file} текст не найден")
+        items = list(get_text_frames(prs))
+        if not items:
             return
 
-        handlers = []
-        stripped_xmls = []
-        
-        for xml_content in xml_contents:
-            handler = XMLMetadataHandler(xml_content)
-            clean_xml = handler.strip()
-            handlers.append(handler)
-            stripped_xmls.append(clean_xml)
+        text_frames, locations = zip(*items)
+        handlers = [XMLMetadataHandler(tf._txBody.xml) for tf in text_frames]
+        stripped_xmls = [h.strip() for h in handlers]
 
-        logging.info(f"ПОДГОТОВКА: Найдено элементов: {len(stripped_xmls)}")
-        for i, (loc, xml) in enumerate(zip(locations, stripped_xmls)):
-            loc_info = f"Тип: {loc[0]}, Слайд: {loc[1]+1}"
-            logging.info(f"Элемент #{i} [{loc_info}] | ПОЛНЫЙ XML ДЛЯ ПЕРЕВОДА: {xml}\n")
+        translated_xmls = translate_all(stripped_xmls)
 
-        translated_stripped_xmls = translate_all(stripped_xmls)
-        
-        logging.info(f"ОТВЕТ ПОЛУЧЕН: Переведено элементов: {len(translated_stripped_xmls)}")
-
-        final_xmls = []
-        for handler, t_xml in zip(handlers, translated_stripped_xmls):
+        for tf, handler, t_xml, loc in zip(text_frames, handlers, translated_xmls, locations):
             try:
                 restored_xml = handler.restore(t_xml)
-                final_xmls.append(restored_xml)
+                new_txBody = parse_xml(restored_xml)
+                old_txBody = tf._txBody
+                old_txBody.getparent().replace(old_txBody, new_txBody)
             except Exception as e:
-                logging.error(f"Ошибка при восстановлении метаданных: {e}")
-                final_xmls.append(t_xml)
+                logging.error(f"Ошибка в {loc}: {e}")
 
-        apply_xml_translations(prs, locations, final_xmls)
         save_presentation(prs, input_file)
         
     except Exception as e:
-        logging.error(f"Ошибка при обработке презентации {input_file}: {str(e)}")
-        raise
+        logging.error(f"Ошибка в {input_file}: {e}")
 
 def main():
-    input_files = glob.glob('input/*.pptx')
-    if not input_files:
-        print("В директории input не найдено файлов PowerPoint")
-        return
-    
-    for input_file in input_files:
+    for input_file in glob.glob('input/*.pptx'):
         process_presentation(input_file)
-        logging.info(f"Перевод файла {input_file} завершен")
 
 if __name__ == "__main__":
-   with keep.running():
+    with keep.running():
         main()
