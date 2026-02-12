@@ -88,12 +88,11 @@ class MainWindow(QMainWindow):
             self.selected_file = file
             self.btn_start.setEnabled(True)
             self.info_label.setText(f"Файл: {os.path.basename(file)}")
-            # Убрали append лога при выборе
 
     def run_translation(self):
         self.btn_start.setEnabled(False)
         self.btn_browse.setEnabled(False)
-        self.log_output.clear() # Очищаем экран перед новым запуском
+        self.log_output.clear()
         
         self.worker = TranslationWorker(self.selected_file)
         self.worker.log_signal.connect(self.update_log)
