@@ -36,7 +36,7 @@ SYSTEM_ROLE = f"{TECHNICAL_INSTRUCTIONS}\n{LOCALIZATION_GUIDELINES}"
 
 def translate_all(texts, batch_size=10, status_callback=None):
     def log(message):
-        print(message)  # Оставляем вывод в консоль для отладки
+        print(message)
         if status_callback:
             status_callback(message)
 
@@ -62,7 +62,7 @@ def translate_all(texts, batch_size=10, status_callback=None):
     with ThreadPoolExecutor(max_workers=10) as executor:
         future_to_batch = {
             executor.submit(_translate_batch, [(i + start, texts[i + start]) 
-            for i in range(len(batches[b_idx]))]): b_idx 
+            for i in range(len(batches[b_idx]))], log): b_idx 
             for b_idx, start in enumerate(range(0, total_texts, batch_size))
         }
         
@@ -81,7 +81,7 @@ def translate_all(texts, batch_size=10, status_callback=None):
 
             percent = (completed_batches / total_batches) * 100
             log(f"⏳ Батч {completed_batches}/{total_batches} завершен ({percent:.1f}%) | "
-                  f"Строк обработано: {min(completed_batches * batch_size, total_texts)}")
+                f"Строк обработано: {min(completed_batches * batch_size, total_texts)}")
 
     end_time = time.perf_counter()
     duration = end_time - start_time
@@ -98,11 +98,9 @@ def translate_all(texts, batch_size=10, status_callback=None):
 
     return results
 
-def _translate_batch(batch):
-    """
-    Принимает список кортежей [(index, text), ...]
-    Возвращает список [(index, translated_text), ...] и статистику токенов.
-    """
+def _translate_batch(batch, log_func):
+    """Принимает список кортежей и функцию логирования. Аргумент log_func обязателен."""
+
     try:
         payload = [{"id": idx, "xml": text} for idx, text in batch]
         
@@ -119,7 +117,7 @@ def _translate_batch(batch):
         raw_content = response.choices[0].message.content
         
         if raw_content is None:
-            print("⚠️ API вернул пустой ответ (None)")
+            log_func("⚠️ API вернул пустой ответ (None)")
             return [(idx, text) for idx, text in batch], response.usage
 
         content = json.loads(raw_content)
@@ -135,5 +133,5 @@ def _translate_batch(batch):
         return result_batch, response.usage
 
     except Exception as e:
-        print(f"\n❌ Ошибка при обработке батча: {e}")
+        log_func(f"❌ Ошибка в батче: {str(e)}")
         return [(idx, text) for idx, text in batch], None
