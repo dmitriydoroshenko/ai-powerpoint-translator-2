@@ -10,48 +10,41 @@ from xml_handler import XMLMetadataHandler
 
 setup_logging()
 
-def get_text_frames(prs):
-    """Генератор, возвращающий все текстовые фреймы и их метаданные."""
-    for s_idx, slide in enumerate(prs.slides):
-        for sh_idx, shape in enumerate(slide.shapes):
-            frames = []
-            
+def collect_translatable_items(prs):
+    """Собирает все объекты для перевода и их типы в плоский список."""
+    items = []
+    
+    for slide in prs.slides:
+        for shape in slide.shapes:
             if shape.has_table:
-                for r_idx, row in enumerate(shape.table.rows):
-                    for c_idx, cell in enumerate(row.cells):
-                        frames.append((cell.text_frame, ("table_cell", s_idx, sh_idx, r_idx, c_idx)))
+                for row in shape.table.rows:
+                    for cell in row.cells:
+                        if cell.text_frame.text.strip():
+                            items.append((cell.text_frame, "frame"))
             
             elif shape.has_chart:
-                chart = getattr(shape, 'chart')
+                chart = shape.chart
+                nodes = chart._element.xpath('.//c:tx//c:v | .//c:cat//c:v | .//c:tx//a:t | .//c:cat//a:t')
+                for node in nodes:
+                    if node.text and node.text.strip():
+                        items.append((node, "xml_node"))
+                
                 if chart.has_title and chart.chart_title.has_text_frame:
-                    frames.append((chart.chart_title.text_frame, ("chart_title", s_idx, sh_idx)))
+                    items.append((chart.chart_title.text_frame, "frame"))
                 
                 for axis_type in ['category_axis', 'value_axis']:
                     try:
                         axis = getattr(chart, axis_type)
-                        if axis.has_title:
-                            frames.append((axis.axis_title.text_frame, (f"chart_{axis_type}", s_idx, sh_idx)))
+                        if axis.has_title and axis.axis_title.has_text_frame:
+                            items.append((axis.axis_title.text_frame, "frame"))
                     except (ValueError, AttributeError):
                         continue
             
             elif hasattr(shape, "text_frame") and shape.text_frame:
-                frames.append((shape.text_frame, ("text_frame", s_idx, sh_idx)))
-
-            for tf, loc in frames:
-                if tf and tf.text.strip():
-                    yield tf, loc
-
-def get_chart_text_nodes(chart):
-    """
-    Извлекает все возможные XML-узлы с текстом из диаграммы:
-    кэш данных, названия рядов и текстовые фреймы внутри серий.
-    """
-    nodes = []
-    nodes.extend(chart._element.xpath('.//c:tx//c:v | .//c:cat//c:v'))
-    rich_nodes = chart._element.xpath('.//c:tx//a:t | .//c:cat//a:t')
-    nodes.extend(rich_nodes)
-    
-    return nodes
+                if shape.text_frame.text.strip():
+                    items.append((shape.text_frame, "frame"))
+                    
+    return items
 
 def process_presentation(input_file):
     """
@@ -61,43 +54,43 @@ def process_presentation(input_file):
     logging.info(f"Обработка файла: {input_file}")
     try:
         prs = Presentation(input_file)
+        work_items = collect_translatable_items(prs)
         
-        items = list(get_text_frames(prs))
-        text_frames, _ = zip(*items) if items else ([], [])
-        
-        chart_nodes = []
-
-        for slide in prs.slides:
-            for shape in slide.shapes:
-                if shape.has_chart:
-                    chart_nodes.extend(get_chart_text_nodes(getattr(shape, 'chart')))
-
-        handlers = [XMLMetadataHandler(tf._txBody.xml) for tf in text_frames]
-        chart_texts = [node.text for node in chart_nodes if node.text]
-        to_translate = [h.strip() for h in handlers] + chart_texts
-        
-        if not to_translate:
+        if not work_items:
             logging.info(f"Нет текста для перевода в {input_file}")
             return
 
-        translated_all = translate_all(to_translate)
-        offset = len(handlers)
-        
-        for tf, handler, t_xml in zip(text_frames, handlers, translated_all[:offset]):
-            try:
-                new_txBody = parse_xml(handler.restore(t_xml))
-                tf._txBody.getparent().replace(tf._txBody, new_txBody)
-            except Exception as e:
-                logging.error(f"Ошибка восстановления фрейма: {e}")
+        to_translate = []
+        handlers = []
 
-        for node, t_text in zip(chart_nodes, translated_all[offset:]):
-            if t_text:
-                node.text = t_text
+        for obj, kind in work_items:
+            if kind == "frame":
+                h = XMLMetadataHandler(obj._txBody.xml)
+                handlers.append(h)
+                to_translate.append(h.strip())
+            else:
+                to_translate.append(obj.text)
+                handlers.append(None)
+
+        translated_results = translate_all(to_translate)
+
+        for (obj, kind), handler, translated_text in zip(work_items, handlers, translated_results):
+            if not translated_text:
+                continue
+            try:
+                if kind == "frame" and handler:
+                    new_xml = handler.restore(translated_text)
+                    new_txBody = parse_xml(new_xml)
+                    obj._txBody.getparent().replace(obj._txBody, new_txBody)
+                else:
+                    obj.text = translated_text
+            except Exception as e:
+                logging.error(f"Ошибка применения перевода: {e}")
 
         save_presentation(prs, input_file)
         
     except Exception as e:
-        logging.error(f"Ошибка в {input_file}: {e}")
+        logging.error(f"Критическая ошибка в {input_file}: {e}")
 
 def main():
     for input_file in glob.glob('input/*.pptx'):
