@@ -32,10 +32,31 @@ def collect_xml_data(prs):
 
             elif shape.has_chart:
                 chart = shape.chart
+
                 if chart.has_title and chart.chart_title.has_text_frame:
                     if chart.chart_title.text_frame.text.strip():
                         xml_contents.append(chart.chart_title.text_frame._txBody.xml)
                         locations.append(("chart_title", s_idx, sh_idx))
+                
+                try:
+                    cat_axis = chart.category_axis 
+                    if cat_axis and cat_axis.has_title:
+                        tx_frame = cat_axis.axis_title.text_frame
+                        if tx_frame.text.strip():
+                            xml_contents.append(tx_frame._txBody.xml)
+                            locations.append(("chart_axis_cat", s_idx, sh_idx))
+                except ValueError:
+                    pass
+
+                try:
+                    val_axis = chart.value_axis
+                    if val_axis and val_axis.has_title:
+                        tx_frame = val_axis.axis_title.text_frame
+                        if tx_frame.text.strip():
+                            xml_contents.append(tx_frame._txBody.xml)
+                            locations.append(("chart_axis_val", s_idx, sh_idx))
+                except ValueError:
+                    pass
 
             elif hasattr(shape, "text_frame") and shape.text_frame:
                 if shape.text_frame.text.strip():
@@ -48,23 +69,32 @@ def apply_xml_translations(prs, locations, translated_xmls):
     for location, new_xml in zip(locations, translated_xmls):
         try:
             new_txBody = parse_xml(new_xml)
+            loc_type = location[0]
+            s_idx = location[1]
+            sh_idx = location[2]
+            slide = prs.slides[s_idx]
+            shape = slide.shapes[sh_idx]
             
-            if location[0] == "text_frame":
-                _, s_idx, sh_idx = location
-                shape = prs.slides[s_idx].shapes[sh_idx]
+            if loc_type == "text_frame":
                 old_txBody = shape.text_frame._txBody
                 old_txBody.getparent().replace(old_txBody, new_txBody)
                 
-            elif location[0] == "table_cell":
-                _, s_idx, sh_idx, r_idx, c_idx = location
-                cell = prs.slides[s_idx].shapes[sh_idx].table.rows[r_idx].cells[c_idx]
+            elif loc_type == "table_cell":
+                r_idx, c_idx = location[3], location[4]
+                cell = shape.table.rows[r_idx].cells[c_idx]
                 old_txBody = cell.text_frame._txBody
                 old_txBody.getparent().replace(old_txBody, new_txBody)
 
-            elif location[0] == "chart_title":
-                _, s_idx, sh_idx = location
-                chart = prs.slides[s_idx].shapes[sh_idx].chart
-                old_txBody = chart.chart_title.text_frame._txBody
+            elif loc_type == "chart_title":
+                old_txBody = shape.chart.chart_title.text_frame._txBody
+                old_txBody.getparent().replace(old_txBody, new_txBody)
+
+            elif loc_type == "chart_axis_cat":
+                old_txBody = shape.chart.category_axis.axis_title.text_frame._txBody
+                old_txBody.getparent().replace(old_txBody, new_txBody)
+
+            elif loc_type == "chart_axis_val":
+                old_txBody = shape.chart.value_axis.axis_title.text_frame._txBody
                 old_txBody.getparent().replace(old_txBody, new_txBody)
 
         except Exception as e:
