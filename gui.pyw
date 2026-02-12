@@ -46,7 +46,6 @@ class MainWindow(QMainWindow):
         
         while True:
             if api_key:
-                self.update_log("🔍 Проверка сохраненного API ключа...")
                 is_valid, error_msg = validate_api_key(api_key)
                 
                 if is_valid:
@@ -71,7 +70,10 @@ class MainWindow(QMainWindow):
                 if is_valid:
                     self.settings.setValue("openai_api_key", key.strip())
                     api_key = key.strip()
+                    set_api_key(api_key)
                     QMessageBox.information(self, "Успех", "API ключ успешно проверен и сохранен!")
+                    self.log_output.clear()
+                    break
                 else:
                     QMessageBox.critical(self, "Ошибка", f"Ключ не прошел проверку, попробуйте другой ключ")
                     api_key = ""
@@ -92,6 +94,7 @@ class MainWindow(QMainWindow):
 
         self.btn_browse = QPushButton("📂 Выбрать файл")
         self.btn_browse.setMinimumHeight(45)
+        self.btn_browse.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_browse.clicked.connect(self.browse_file)
         layout.addWidget(self.btn_browse)
 
@@ -127,14 +130,15 @@ class MainWindow(QMainWindow):
         if file:
             self.selected_file = file
             self.btn_start.setEnabled(True)
+            self.btn_start.setCursor(Qt.CursorShape.PointingHandCursor)
             self.log_output.clear()
-            self.update_log(f"📁 Выбран файл: {os.path.basename(file)}")
+            self.update_log(f"✅ Выбрана презентация: {self.selected_file}")
 
     def run_translation(self):
         """Запуск процесса в отдельном потоке."""
         self.btn_start.setEnabled(False)
+        self.btn_start.setCursor(Qt.CursorShape.ArrowCursor)
         self.btn_browse.setEnabled(False)
-        self.log_output.clear()
         
         self.worker = TranslationWorker(self.selected_file)
         self.worker.log_signal.connect(self.update_log)
@@ -149,6 +153,7 @@ class MainWindow(QMainWindow):
     def on_finished(self):
         """Разблокировка интерфейса по завершении."""
         self.btn_start.setEnabled(True)
+        self.btn_start.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_browse.setEnabled(True)
 
 if __name__ == "__main__":
