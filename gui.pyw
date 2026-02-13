@@ -3,12 +3,8 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton, QVBoxLayout
                              QWidget, QFileDialog, QLabel, QTextEdit, QInputDialog, 
                              QLineEdit, QMessageBox)
 from PyQt5.QtCore import QThread, pyqtSignal, Qt, QSettings
-
-try:
-    from logic import process_presentation
-    from translator import set_api_key, validate_api_key
-except ImportError as e:
-    print(f"Ошибка импорта: {e}")
+from logic import process_presentation
+from translator import set_api_key, validate_api_key
 
 class TranslationWorker(QThread):
     """Поток для выполнения перевода конкретного файла"""
