@@ -47,7 +47,6 @@ SYSTEM_ROLE = f"{TECHNICAL_INSTRUCTIONS}\n{LOCALIZATION_GUIDELINES}"
 
 def translate_all(texts, batch_size=10, status_callback=None):
     def log(message):
-        print(message)
         if status_callback:
             status_callback(message)
 

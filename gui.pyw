@@ -17,6 +17,7 @@ class TranslationWorker(QThread):
 
     def run(self):
         if not self.file_path:
+            self.log_signal.emit("⚠️ Файл не выбран.")
             self.finished_signal.emit()
             return
 
@@ -33,7 +34,13 @@ class MainWindow(QMainWindow):
         self.settings = QSettings("AI_Tools", "PPT_Translator")
         self.selected_file = "" 
         self.init_ui()
-        self.check_api_key()
+
+    def showEvent(self, event):
+        """Срабатывает при открытии окна. Запускает проверку API ключа."""
+        super().showEvent(event)
+        if not hasattr(self, '_api_checked'):
+            self._api_checked = True
+            self.check_api_key()
 
     def check_api_key(self):
         """Проверяет ключ при старте. Если в реестре невалидный ключ — запрашивает новый."""
@@ -100,7 +107,6 @@ class MainWindow(QMainWindow):
 
         self.btn_start = QPushButton("🚀 Начать перевод")
         self.btn_start.setEnabled(False)
-        self.btn_browse.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_start.setStyleSheet("""
             QPushButton { 
                 background-color: #2ecc71; 
@@ -142,7 +148,8 @@ class MainWindow(QMainWindow):
         self.worker.start()
 
     def update_log(self, text):
-        """Добавление текста в лог и автоматическая прокрутка."""
+        """Добавление текста в лог GUI и вывод в консоль."""
+        print(text, flush=True)
         self.log_output.append(text)
         self.log_output.ensureCursorVisible()
 

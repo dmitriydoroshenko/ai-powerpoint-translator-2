@@ -20,13 +20,11 @@ def save_presentation(prs, original_filename, callback=None):
     try:
         prs.save(output_filename)
         message = f"💾 Файл сохранен рядом с оригиналом: {output_filename}"
-        print(message)
         if callback:
             callback(message)
         return output_filename
     except Exception as e:
         error_msg = f"❌ Ошибка при записи {output_filename}: {e}"
-        print(error_msg)
         if callback:
             callback(error_msg)
         raise e
