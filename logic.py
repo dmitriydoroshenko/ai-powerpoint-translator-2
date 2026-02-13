@@ -1,8 +1,6 @@
-import glob
 import os
 from pptx import Presentation
 from pptx.oxml import parse_xml
-from wakepy import keep
 from translator import translate_all
 from file_utils import save_presentation
 from xml_handler import XMLMetadataHandler
@@ -51,7 +49,7 @@ def process_presentation(input_file, callback=None):
     перевод фреймов и элементов графиков, сохранение результата.
     """
     def log(message):
-        print(message)
+        log(message)
         if callback:
             callback(message)
 
@@ -95,12 +93,3 @@ def process_presentation(input_file, callback=None):
     except Exception as e:
         log(f"❌ Критическая ошибка в {os.path.basename(input_file)}: {e}")
         raise e
-
-def main():
-    """Запуск через консоль"""
-    for input_file in glob.glob('input/*.pptx'):
-        process_presentation(input_file)
-
-if __name__ == "__main__":
-    with keep.running():
-        main()

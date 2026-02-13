@@ -1,12 +1,11 @@
 import sys
-import os
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton, QVBoxLayout, 
                              QWidget, QFileDialog, QLabel, QTextEdit, QInputDialog, 
                              QLineEdit, QMessageBox)
 from PyQt5.QtCore import QThread, pyqtSignal, Qt, QSettings
 
 try:
-    from main import process_presentation
+    from logic import process_presentation
     from translator import set_api_key, validate_api_key
 except ImportError as e:
     print(f"Ошибка импорта: {e}")
