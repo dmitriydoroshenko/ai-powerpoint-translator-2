@@ -132,7 +132,7 @@ class MainWindow(QMainWindow):
             self.btn_start.setEnabled(True)
             self.btn_start.setCursor(Qt.CursorShape.PointingHandCursor)
             self.log_output.clear()
-            self.update_log(f"✅ Выбрана презентация: {self.selected_file}")
+            self.update_log(f"✅ Выбран файл: {self.selected_file}")
 
     def run_translation(self):
         """Запуск процесса в отдельном потоке."""

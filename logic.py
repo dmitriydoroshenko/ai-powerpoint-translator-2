@@ -49,7 +49,6 @@ def process_presentation(input_file, callback=None):
     перевод фреймов и элементов графиков, сохранение результата.
     """
     def log(message):
-        log(message)
         if callback:
             callback(message)
 
